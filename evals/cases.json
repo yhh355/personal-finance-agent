@@ -1,0 +1,60 @@
+{
+  "offline_cases": [
+    {
+      "id": "monthly_insights",
+      "description": "Verify deterministic total, largest category, and budget status for the synthetic statement.",
+      "maximum_spending": 1800.0,
+      "expected": {
+        "total_spending": 1509.98,
+        "highest_category": "Lifestyle and Social",
+        "budget_status": "within_limit"
+      }
+    },
+    {
+      "id": "social_merchant_query",
+      "description": "Verify a bounded category-and-merchant aggregation query.",
+      "query": {
+        "category": "Lifestyle and Social",
+        "group_by": "merchant",
+        "limit": 10
+      },
+      "expected": {
+        "matching_transaction_count": 4,
+        "matching_spending": 650.0,
+        "first_merchant": "Social Activity"
+      }
+    },
+    {
+      "id": "protected_saving_plan",
+      "description": "Verify that protected categories are excluded from a deterministic saving plan.",
+      "saving_target": 200.0,
+      "protected_categories": ["Food and Dining", "Transport"],
+      "expected": {
+        "first_category": "Lifestyle and Social",
+        "first_reduction_amount": 200.0,
+        "is_achievable": true
+      }
+    },
+    {
+      "id": "three_tool_workflow",
+      "description": "Verify that the demo scenario can produce insight, evidence query, and a protected saving plan.",
+      "expected_tools": [
+        "get_spending_insights",
+        "query_transactions",
+        "create_saving_plan"
+      ]
+    }
+  ],
+  "live_cases": [
+    {
+      "id": "overspending_diagnosis",
+      "prompt": "Why did I spend so much this month? Analyse the overall pattern and the transactions that contributed most.",
+      "required_tools": ["get_spending_insights", "query_transactions"]
+    },
+    {
+      "id": "protected_savings_request",
+      "prompt": "I want to save S$200. Analyse the evidence first, then create a practical plan without reducing Food and Dining or Transport.",
+      "required_tools": ["get_spending_insights", "query_transactions", "create_saving_plan"]
+    }
+  ]
+}

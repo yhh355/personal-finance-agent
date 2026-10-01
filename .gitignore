@@ -1,7 +1,10 @@
 .venv/
+node_modules/
 __pycache__/
 .pytest_cache/
 .test-temp/
 .env
 data/statements/*.csv
 !data/statements/.gitkeep
+data/*.inspect.ndjson
+data/*_preview.png
