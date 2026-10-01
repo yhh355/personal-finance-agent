@@ -1,5 +1,19 @@
 # Personal Finance Statement Agent
 
+Personal Finance Statement Agent is a PE6201 course project that turns an uploaded payment statement into a transparent, conversational budgeting workflow. A user uploads a WeChat Pay XLSX file, reviews the extracted local CSV and budget categories, sets a spending limit and protected categories, then asks questions in a Streamlit chat.
+
+The application combines deterministic Python calculations with an OpenRouter-powered Agent. Python performs transaction filtering, aggregation, budget checks, and savings-plan calculations; the Agent selects bounded read-only tools, reviews their observations, and explains the result. This keeps financial figures traceable while supporting multi-step questions such as diagnosing overspending and creating a protected-category savings plan.
+
+The project deliberately avoids bank integration, arbitrary SQL, and automatic financial decisions. Statements remain local CSV files, users can review categories before analysis, and the Agent cannot modify statement data.
+
+## Workflow
+
+```text
+Upload XLSX statement
+  -> direct XLSX-to-CSV import
+  -> data/statements/<billing-period>.csv
+  -> deterministic initial summary + an agent that can query the local statement
+```
 
 ## Inputs
 
