@@ -1,144 +1,125 @@
 # Personal Finance Statement Agent
 
-Personal Finance Statement Agent is a PE6201 course project that turns an uploaded payment statement into a transparent, conversational budgeting workflow. A user uploads a WeChat Pay XLSX file, reviews the extracted local CSV and budget categories, sets a spending limit and protected categories, then asks questions in a Streamlit chat.
+A PE6201 Emerging AI Technologies project that turns an uploaded payment statement into a transparent budgeting conversation. The user uploads a WeChat Pay-style XLSX file, reviews the locally extracted CSV, sets financial constraints, and asks an OpenRouter-powered Agent to investigate spending through bounded tools.
 
-The application combines deterministic Python calculations with an OpenRouter-powered Agent. Python performs transaction filtering, aggregation, budget checks, and savings-plan calculations; the Agent selects bounded read-only tools, reviews their observations, and explains the result. This keeps financial figures traceable while supporting multi-step questions such as diagnosing overspending and creating a protected-category savings plan.
+The design deliberately separates language from arithmetic: Python performs all extraction and financial calculations; the model chooses an investigation path and explains tool observations in natural language.
 
-The project deliberately avoids bank integration, arbitrary SQL, and automatic financial decisions. Statements remain local CSV files, users can review categories before analysis, and the Agent cannot modify statement data.
+## Who it is for
 
-## Product documentation
+The primary user is a student or early-career adult with an exported payment statement who wants to understand monthly spending without manually creating spreadsheet summaries. The application is a local, course-demo MVP - not a banking product or investment adviser.
 
-**Persona.** The primary persona is a student or early-career adult who has an exported payment statement but does not want to manually analyse every transaction in a spreadsheet. They need a private, understandable way to identify overspending and explore a constrained monthly saving goal.
+## Inputs and outputs
 
-**Inputs.** The user provides an XLSX payment statement, a billing month, a maximum monthly spending limit, a saving target, and categories to protect from reduction suggestions.
+| Input | Output |
+| --- | --- |
+| XLSX payment statement | Local canonical CSV with `Date`, `Merchant`, `Description`, `Amount`, and `Category` |
+| Billing month and monthly spending limit | Deterministic spending summary and budget status |
+| Saving target and categories to keep | Protected-category saving plan |
+| Natural-language question | Evidence-based answer and inspectable tool-call trace |
 
-**Outputs.** The app produces an extracted local CSV, a deterministic monthly summary and budget status, an Agent response with evidence-based spending analysis, a bounded tool-call trace, and an optional protected-category saving plan.
+Real statements remain in `data/statements/`, which is ignored by Git. The version-controlled [`data/demo_statement.xlsx`](data/demo_statement.xlsx) is synthetic and safe for demonstration.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    A[User uploads XLSX] --> B[Direct Python extractor]
-    B --> C[Local canonical CSV]
-    U[Budget target and protected categories] --> D[Streamlit chat]
-    C --> D
-    D --> E[OpenRouter Agent]
-    E --> F{Model selects tool}
-    F --> G[Python deterministic tools]
-    G --> H[JSON observation]
-    H --> E
-    E --> I[Evidence based answer]
+    A[User uploads XLSX] --> B[Python extractor]
+    B --> C[Local CSV]
+    D[Budget, target, protected categories] --> E[Streamlit chat]
+    C --> E
+    E --> F[OpenRouter Agent]
+    F --> G[Bounded Python tools]
+    G --> H[JSON observations]
+    H --> F
+    F --> I[Evidence-based response]
 ```
 
-The model never directly edits the CSV. It selects tool names and arguments; Python executes bounded local functions and returns observations to the model. The current loop requires at least two tool observations before finalising an answer, while the model decides which complementary tools to use.
+The model cannot edit the statement, run arbitrary SQL, access a different month, or retrieve unlimited transactions. Python executes every tool call against the selected local CSV and returns a structured observation to the model.
 
 ## Workflow
 
 ```text
-User uploads XLSX statement
-  -> Direct extractor creates a local CSV
-  -> User sets budget, saving target, and protected categories
-  -> User asks a finance question
-  -> Agent selects a suitable read-only tool
-  -> Python executes the tool on the local CSV and returns an observation
-  -> Agent reviews the observation and selects a second complementary tool
-  -> Final evidence-based answer and savings recommendation
+Upload XLSX
+  -> Extract local CSV
+  -> Set budget, saving target, and protected categories
+  -> Ask a question in Streamlit chat
+  -> Agent investigates with local tool observations
+  -> Python performs deterministic calculations
+  -> Agent explains the evidence and, when requested, a saving plan
 ```
 
-## Inputs
+The Agent normally gathers at least two observations before it can answer. For an explicit saving or reduction request, it must also call the deterministic `create_saving_plan` tool so the selected protected categories are respected.
 
-1. An `.xlsx` statement. Its first worksheet needs `Date` and `Amount` columns. `Merchant`, `Description`, and `Category` are optional.
-2. Your maximum monthly spending in SGD.
-3. Your saving target in SGD.
-4. The budget categories you want to keep. The saving tool will exclude these categories and analyse all other spending for possible reductions.
+## Tools
 
-The extraction tool normalises the worksheet into `Date, Merchant, Description, Amount, Category` and saves it under `data/statements/`. A single-month statement becomes `YYYY-MM.csv`; a multi-month statement becomes `YYYY-MM_to_YYYY-MM.csv`.
+The XLSX extractor is a direct UI operation, not an Agent tool. The Agent has three read-only analysis tools:
 
-WeChat Pay XLSX exports are supported: the extractor finds their Chinese transaction header after the introductory rows, maps `交易时间`, `交易对方`, `商品`, `收/支`, and `金额(元)`, and retains only `支出` rows. It suggests one of seven English budgeting categories: `Living`, `Food and Dining`, `Transport`, `Entertainment`, `Shopping`, `Lifestyle and Social`, or `Other`. Review and correct the suggestions in the UI before analysis.
+- `get_spending_insights` - calculates total spending, category shares, largest transactions, and budget status for the selected month.
+- `query_transactions` - performs a bounded query by category or merchant and groups results by transaction, category, merchant, or date.
+- `create_saving_plan` - creates deterministic reductions for the selected saving target while excluding categories marked to keep.
 
-## Data import
+## Statement import
 
-`extract_xlsx_statement` is a direct Streamlit data operation, not an agent or analysis tool. It runs only when a user uploads an XLSX file and clicks **Extract XLSX to CSV**.
+The extractor supports WeChat Pay exports with introductory rows and Chinese transaction headers. It maps the relevant fields, retains only expense (`支出`) transactions, and suggests one of seven English budget categories: `Living`, `Food and Dining`, `Transport`, `Entertainment`, `Shopping`, `Lifestyle and Social`, and `Other`.
 
-## Agent analysis tools
+Users can review and correct suggested categories in the Streamlit interface before analysis. The extractor does not use an LLM and is not exposed to the Agent.
 
-- `query_transactions`: a bounded, read-only query over the selected month. The agent can filter by category or merchant text and group the result by transaction, category, merchant, or date.
-- `get_spending_insights`: deterministic total, category shares, largest transactions, and monthly budget status.
-- `create_saving_plan`: deterministic reductions for the saving target, excluding categories you marked to keep.
-
-This is deliberately a composable data-agent design: the model decides which tool to call and can make several bounded queries before answering. It cannot supply arbitrary SQL, write to a statement, access another month, or request more than 20 items from one query.
-
-All arithmetic is deterministic Python. Streamlit invokes the extraction tool after an upload and runs the multi-tool analysis workflow after you provide the three finance inputs. This avoids using an LLM to parse or alter a financial statement.
-
-## OpenRouter agent
-
-To use a real agent, copy `.env.example` to `.env`, set `OPENROUTER_API_KEY`, restart Streamlit, and use the chat at the bottom of the page. The model decides which local analysis tool is useful, Python executes it against the extracted CSV, and the model writes the final explanation. The XLSX import function is never exposed as an agent tool.
+## Setup and run
 
 ```powershell
-Copy-Item .env.example .env
-# Edit .env and set OPENROUTER_API_KEY
-```
-
-## Run
-
-```powershell
-cd C:\Users\ROG\personal-finance-agent
+git clone https://github.com/yhh355/personal-finance-agent.git
+cd personal-finance-agent
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
 streamlit run app.py
 ```
 
-## Data and evaluation
+To enable live Agent calls, create `.env` from `.env.example` and add an OpenRouter key:
 
-The version-controlled public dataset is [`data/demo_statement.xlsx`](data/demo_statement.xlsx). It is synthetic and safe to upload for a demo. See [`data/README.md`](data/README.md) for its fields, expected totals, and privacy treatment. Real statements belong only in `data/statements/`, which is ignored by Git.
+```powershell
+Copy-Item .env.example .env
+# Edit .env: OPENROUTER_API_KEY=your-key
+```
 
-Run deterministic offline evaluation without an API key:
+Never commit `.env` or a real payment statement.
+
+## Evaluation
+
+Run the deterministic offline suite without an API key:
 
 ```powershell
 python eval.py --mode offline
+pytest
 ```
 
-Run optional live Agent tool-coverage evaluation after configuring OpenRouter:
+Run the optional live suite only after configuring OpenRouter:
 
 ```powershell
 python eval.py --mode live
 ```
 
-The checked-in cases, definitions, and baseline result are in [`evals/`](evals/). The live evaluation is intentionally opt-in because model calls incur cost and can vary by model.
+| Metric | Latest result | Scope |
+| --- | ---: | --- |
+| Offline deterministic cases | 4/4 (100%) | Extractor and financial-tool correctness on the synthetic statement |
+| Unit tests | 9/9 passed | Extraction, calculations, Agent rules, and evaluation configuration |
+| Live required-tool coverage | 9/10 (90%) | One 2026-10-01 run using `openai/gpt-4.1-mini` through OpenRouter |
 
-## Metrics
-
-| Metric | Target | Reached | Evidence |
-| --- | ---: | ---: | --- |
-| Deterministic offline case pass rate | 100% | 4/4 (100%) | `python eval.py --mode offline` |
-| Unit-test pass rate | 100% | 7/7 (100%) | `pytest` |
-| Tool observations before a final answer | At least 2 | Enforced in code | `MINIMUM_TOOL_CALLS = 2` in `agent.py` |
-| Live required-tool coverage | Report after live run | Not claimed yet | `python eval.py --mode live` |
+Live coverage checks whether the required tools appeared in an Agent trace. It is not a claim of universal factual accuracy or subjective answer quality. The 10 live cases and their metric definitions are documented in [`evals/`](evals/).
 
 ## Repository map
 
-- `app.py` - single-page Streamlit interface and chat state.
-- `finance_tools.py` - XLSX extraction and deterministic local financial tools.
-- `agent.py` - OpenRouter tool-calling loop, prompts, and tool dispatch.
-- `eval.py` and `evals/` - reproducible offline checks and opt-in live tool-coverage evaluation.
+- `app.py` - Streamlit UI, category review, initial analysis, and chat state.
+- `finance_tools.py` - XLSX extraction and deterministic financial tools.
+- `agent.py` - OpenRouter tool-calling loop, prompt, and safe dispatch.
+- `eval.py` and `evals/` - offline evaluation and opt-in live tool-coverage evaluation.
 - `data/` - synthetic demo statement and data documentation.
-- `tests/` - unit tests for extraction, tools, Agent surface, and offline evaluation.
-- `REPORT.md` - final project report and critique.
-- `demo/README.md` - video recording and submission checklist.
-
-## Test
-
-```powershell
-pytest
-```
-
-## Demo submission
-
-Use the synthetic demo statement for recording. The video should show both your face and the application screen, be approximately 5 to 8 minutes, and demonstrate import, constraints, an Agent multi-tool trace, and a protected-category savings plan. See [`demo/README.md`](demo/README.md) for the checklist.
+- `tests/` - unit tests.
+- [`Personal_Finance_Agent_Final_Report.docx`](Personal_Finance_Agent_Final_Report.docx) - final project report and critique.
 
 ## Limitations
 
-- The app treats all retained statement amounts as expenses by absolute value. Review the extracted CSV before using a statement that includes refunds, income, or transfers.
-- It stores only local CSV files and does not connect to a bank.
-- Recommendations are budgeting information, not professional financial advice.
+- Statements are uploaded manually; there is no bank integration.
+- The current MVP analyses one selected month at a time.
+- Merchant labels and transfers can be ambiguous, so user category review remains important.
+- The system provides budgeting information only, not professional financial or investment advice.
