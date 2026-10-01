@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +17,17 @@ load_dotenv(ROOT / ".env")
 MODEL_NAME = os.getenv("FINANCE_AGENT_MODEL", "openai/gpt-4.1-mini")
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 MINIMUM_TOOL_CALLS = 2
+
+
+def _requires_saving_plan(query: str) -> bool:
+    """Return whether a user explicitly requests a saving/reduction recommendation."""
+    return bool(
+        re.search(
+            r"\b(save|saving|reduce|reduction|cut|cutting|trim|spend less|lower spending)\b",
+            query,
+            flags=re.IGNORECASE,
+        )
+    )
 
 
 def _schema(name: str, description: str, properties: dict[str, Any], required: list[str]) -> dict[str, Any]:
@@ -52,7 +64,7 @@ def _system_prompt(context: dict[str, Any]) -> str:
         "Decision making: You decide which tools to call and in which order. Before answering, collect at least two complementary tool observations; do not repeat an identical tool call merely to meet this requirement. "
         "Evidence: All claims about transaction amounts, categories, merchants, dates, budget status, or saving capacity must come from a local tool result in this conversation. Never invent a transaction, category, cause, or amount. Do not alter UI constraints. "
         "Tool strategy: For a simple factual question, one relevant tool may be enough. Use get_spending_insights for a monthly overview or budget question. Use query_transactions to investigate a category, merchant, date, or unusually large transaction. Use create_saving_plan only if the user explicitly asks for a saving or reduction recommendation. "
-        "Complex analysis: For why, diagnosis, comparison, or recommendation questions, conduct a multi-step investigation. Start with get_spending_insights, then use query_transactions to inspect the evidence behind the largest or relevant spending. For a saving request, inspect evidence before create_saving_plan, and never recommend reducing categories the user marked to keep. "
+        "Complex analysis: For why, diagnosis, comparison, or recommendation questions, conduct a multi-step investigation. Start with get_spending_insights, then use query_transactions to inspect the evidence behind the largest or relevant spending. For every saving or reduction request, after inspecting evidence you MUST call create_saving_plan before the final answer. A repeated query_transactions call is not a substitute for create_saving_plan. Never recommend reducing categories the user marked to keep. "
         "Interpretation: Most Lifestyle and Social spending may reflect social or entertainment activity, but never assume every transfer or item in that category has that meaning. State uncertainty when descriptions do not support a confident conclusion. "
         "Final response: Give (1) a direct conclusion, (2) 2–4 evidence points with SGD amounts, (3) specific practical next actions when useful, and (4) one short limitation or caveat when the data is ambiguous. Do not mention internal tool names unless the user asks. Keep personal names and unnecessary raw transaction descriptions out of the answer. This is budgeting information, not professional financial advice. "
         "Current UI context: " + json.dumps(context, ensure_ascii=False)
@@ -69,6 +81,7 @@ def run_openrouter_agent(query: str, frame: pd.DataFrame, month: str, maximum_sp
     from openai import OpenAI
 
     context = {"selected_month": month, "maximum_monthly_spending_sgd": maximum_spending, "saving_target_sgd": saving_target, "protected_budget_categories": protected_categories}
+    saving_plan_required = _requires_saving_plan(query)
     system = _system_prompt(context)
     client = OpenAI(base_url=OPENROUTER_BASE_URL, api_key=api_key, default_headers={"X-OpenRouter-Title": "Personal Finance Statement Agent"})
     safe_history = [
@@ -83,7 +96,14 @@ def run_openrouter_agent(query: str, frame: pd.DataFrame, month: str, maximum_sp
         # The model selects the tools and their order. The loop requires two
         # observations so a response is based on investigation rather than one
         # isolated aggregate; after that the model decides whether to continue.
-        tool_choice: Any = "required" if len(trace) < MINIMUM_TOOL_CALLS else "auto"
+        # A savings question needs a deterministic, protected-category-aware
+        # recommendation. The model still selects its initial investigation,
+        # but the final planning step is mandatory for that request type.
+        saving_plan_called = any(item["tool"] == "create_saving_plan" for item in trace)
+        if saving_plan_required and len(trace) >= MINIMUM_TOOL_CALLS and not saving_plan_called:
+            tool_choice: Any = {"type": "function", "function": {"name": "create_saving_plan"}}
+        else:
+            tool_choice = "required" if len(trace) < MINIMUM_TOOL_CALLS else "auto"
         response = client.chat.completions.create(model=MODEL_NAME, messages=messages, tools=AGENT_TOOL_SCHEMAS, tool_choice=tool_choice, parallel_tool_calls=tool_choice == "auto")
         if response.usage and response.usage.total_tokens:
             total_tokens += response.usage.total_tokens

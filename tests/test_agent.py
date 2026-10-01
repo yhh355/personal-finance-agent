@@ -1,4 +1,4 @@
-from agent import AGENT_TOOL_SCHEMAS, MINIMUM_TOOL_CALLS, _system_prompt
+from agent import AGENT_TOOL_SCHEMAS, MINIMUM_TOOL_CALLS, _requires_saving_plan, _system_prompt
 
 
 def test_agent_exposes_three_composable_analysis_tools():
@@ -16,3 +16,9 @@ def test_agent_prompt_leaves_tool_selection_to_the_model():
     assert "Use query_transactions" in prompt
     assert "Use create_saving_plan only if the user explicitly asks" in prompt
     assert "multi-step investigation" in prompt
+
+
+def test_explicit_saving_requests_require_a_deterministic_saving_plan():
+    assert _requires_saving_plan("Help me save S$200 without cutting transport.")
+    assert _requires_saving_plan("How can I reduce my spending this month?")
+    assert not _requires_saving_plan("Why is my Lifestyle and Social spending high?")
