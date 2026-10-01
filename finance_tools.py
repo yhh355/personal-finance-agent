@@ -11,7 +11,23 @@ import pandas as pd
 
 
 REQUIRED_COLUMNS = ("Date", "Merchant", "Description", "Amount", "Category")
-BUDGET_CATEGORIES = ("生活", "餐饮", "交通", "娱乐", "购物", "生活娱乐", "其他")
+BUDGET_CATEGORIES = ("Living", "Food and Dining", "Transport", "Entertainment", "Shopping", "Lifestyle and Social", "Other")
+_LEGACY_CATEGORY_LABELS = {
+    "生活": "Living",
+    "餐饮": "Food and Dining",
+    "交通": "Transport",
+    "娱乐": "Entertainment",
+    "购物": "Shopping",
+    "生活娱乐": "Lifestyle and Social",
+    "其他": "Other",
+    "living": "Living",
+    "food and dining": "Food and Dining",
+    "transport": "Transport",
+    "entertainment": "Entertainment",
+    "shopping": "Shopping",
+    "lifestyle and social": "Lifestyle and Social",
+    "other": "Other",
+}
 TOOL_DESCRIPTORS = {
     "query_transactions": "Read-only transaction query with optional category or merchant filters, and grouping by transaction, category, merchant, or date.",
     "get_spending_insights": "Return deterministic monthly totals, category shares, largest transactions, and budget status.",
@@ -68,18 +84,18 @@ def _suggest_budget_category(merchant: object, description: object, transaction_
     """Provide a revisable initial budget category; the user can correct it in the UI."""
     text = " ".join(str(value).lower() for value in (merchant, description, transaction_type))
     if any(word in text for word in ("grabfood", "food", "restaurant", "cafe", "dining", "餐", "饭", "食", "茶", "咖啡", "火锅")):
-        return "餐饮"
+        return "Food and Dining"
     if any(word in text for word in ("grab", "taxi", "mrt", "bus", "transport", "交通", "地铁", "出租", "停车")):
-        return "交通"
+        return "Transport"
     if any(word in text for word in ("movie", "cinema", "netflix", "spotify", "game", "娱乐", "电影", "游戏")):
-        return "娱乐"
+        return "Entertainment"
     if any(word in text for word in ("shopee", "lazada", "shopping", "购物", "服饰")):
-        return "购物"
+        return "Shopping"
     if any(word in text for word in ("transfer", "转账", "红包", "群收款")):
-        return "生活娱乐"
+        return "Lifestyle and Social"
     if any(word in text for word in ("ntuc", "fairprice", "supermarket", "grocer", "超市", "生鲜", "rent", "utilities", "房租", "水电")):
-        return "生活"
-    return "其他"
+        return "Living"
+    return "Other"
 
 
 def _billing_period(dates: pd.Series) -> str:
@@ -129,7 +145,7 @@ def extract_xlsx_statement(file_bytes: bytes, source_filename: str, output_dir: 
     frame["Date"] = frame["Date"].dt.strftime("%Y-%m-%d")
     for column in ("Merchant", "Description", "Category"):
         frame[column] = frame[column].fillna("").astype(str).str.strip()
-    frame.loc[frame["Category"] == "", "Category"] = "其他"
+    frame.loc[frame["Category"] == "", "Category"] = "Other"
 
     period = _billing_period(pd.to_datetime(frame["Date"]))
     destination_dir = Path(output_dir)
@@ -145,7 +161,9 @@ def load_statement(csv_path: Path | str) -> pd.DataFrame:
         raise ValueError("Extracted CSV has an unexpected format.")
     frame["Date"] = pd.to_datetime(frame["Date"], errors="raise")
     frame["Amount"] = pd.to_numeric(frame["Amount"], errors="raise")
-    frame["Category"] = frame["Category"].astype(str).str.strip().str.lower()
+    frame["Category"] = frame["Category"].astype(str).str.strip().map(
+        lambda value: _LEGACY_CATEGORY_LABELS.get(value.casefold(), value)
+    )
     return frame
 
 
@@ -206,8 +224,8 @@ def query_transactions(
         raise ValueError("limit must be between 1 and 20.")
     rows = _month_rows(frame, month)
     if category:
-        normalised_category = category.strip().lower()
-        rows = rows.loc[rows["Category"] == normalised_category].copy()
+        normalised_category = category.strip().casefold()
+        rows = rows.loc[rows["Category"].str.casefold() == normalised_category].copy()
     if merchant_contains:
         rows = rows.loc[rows["Merchant"].str.contains(merchant_contains.strip(), case=False, regex=False, na=False)].copy()
 
@@ -255,10 +273,11 @@ def create_saving_plan(frame: pd.DataFrame, month: str, saving_target: float, pr
     saving_target = round(float(saving_target), 2)
     if saving_target <= 0:
         raise ValueError("Saving target must be greater than zero.")
-    protected = {item.strip() for item in protected_categories if item.strip()}
+    protected_labels = {item.strip() for item in protected_categories if item.strip()}
+    protected = {item.casefold() for item in protected_labels}
     rows = _month_rows(frame, month)
     category_totals = rows.groupby("Category")["Amount"].sum().to_dict()
-    candidates = sorted(((category, float(amount)) for category, amount in category_totals.items() if category not in protected), key=lambda item: item[1], reverse=True)
+    candidates = sorted(((category, float(amount)) for category, amount in category_totals.items() if category.casefold() not in protected), key=lambda item: item[1], reverse=True)
     remaining = saving_target
     recommendations = []
     for category, spending in candidates:
@@ -268,7 +287,7 @@ def create_saving_plan(frame: pd.DataFrame, month: str, saving_target: float, pr
         recommendations.append({"category": category, "reduction_amount": reduction, "category_spending": round(spending, 2)})
         remaining = round(remaining - reduction, 2)
     return {
-        "month": month, "target_amount": saving_target, "protected_categories": sorted(protected),
+        "month": month, "target_amount": saving_target, "protected_categories": sorted(protected_labels),
         "recommendations": recommendations, "unmet_amount": max(0.0, remaining),
         "is_achievable": remaining == 0, "currency": "SGD",
     }

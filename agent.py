@@ -26,7 +26,7 @@ MONTH = {"type": "string", "description": "Billing month in YYYY-MM."}
 AGENT_TOOL_SCHEMAS = [
     _schema("query_transactions", "Read the selected month's local statement. Filter by category or merchant text, then return the largest matching transactions or group spending by category, merchant, or date. Use it to investigate a specific question.", {
         "month": MONTH,
-        "category": {"type": "string", "description": "Optional exact budget category, for example 餐饮 or 生活娱乐."},
+        "category": {"type": "string", "description": "Optional exact budget category, for example Food and Dining or Lifestyle and Social."},
         "merchant_contains": {"type": "string", "description": "Optional text to find in merchant names."},
         "group_by": {"type": "string", "enum": ["transaction", "category", "merchant", "date"], "description": "How to present the matching rows."},
         "limit": {"type": "integer", "minimum": 1, "maximum": 20, "description": "Maximum returned items."},
@@ -48,12 +48,12 @@ def _execute(name: str, arguments: dict[str, Any], frame: pd.DataFrame, maximum_
 
 def _system_prompt(context: dict[str, Any]) -> str:
     return (
-        "Role: You are a thoughtful personal-finance analysis agent for one selected local statement month. Reply in Chinese when the user writes Chinese. "
+        "Role: You are a thoughtful personal-finance analysis agent for one selected local statement month. Reply in English unless the user explicitly requests another language. "
         "Decision making: You decide which tools to call and in which order. Before answering, collect at least two complementary tool observations; do not repeat an identical tool call merely to meet this requirement. "
         "Evidence: All claims about transaction amounts, categories, merchants, dates, budget status, or saving capacity must come from a local tool result in this conversation. Never invent a transaction, category, cause, or amount. Do not alter UI constraints. "
         "Tool strategy: For a simple factual question, one relevant tool may be enough. Use get_spending_insights for a monthly overview or budget question. Use query_transactions to investigate a category, merchant, date, or unusually large transaction. Use create_saving_plan only if the user explicitly asks for a saving or reduction recommendation. "
         "Complex analysis: For why, diagnosis, comparison, or recommendation questions, conduct a multi-step investigation. Start with get_spending_insights, then use query_transactions to inspect the evidence behind the largest or relevant spending. For a saving request, inspect evidence before create_saving_plan, and never recommend reducing categories the user marked to keep. "
-        "Interpretation: Most 生活娱乐 spending may reflect social or entertainment activity, but never assume every transfer or item in that category has that meaning. State uncertainty when descriptions do not support a confident conclusion. "
+        "Interpretation: Most Lifestyle and Social spending may reflect social or entertainment activity, but never assume every transfer or item in that category has that meaning. State uncertainty when descriptions do not support a confident conclusion. "
         "Final response: Give (1) a direct conclusion, (2) 2–4 evidence points with SGD amounts, (3) specific practical next actions when useful, and (4) one short limitation or caveat when the data is ambiguous. Do not mention internal tool names unless the user asks. Keep personal names and unnecessary raw transaction descriptions out of the answer. This is budgeting information, not professional financial advice. "
         "Current UI context: " + json.dumps(context, ensure_ascii=False)
     )

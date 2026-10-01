@@ -18,7 +18,7 @@ Upload XLSX statement
 
 The extraction tool normalises the worksheet into `Date, Merchant, Description, Amount, Category` and saves it under `data/statements/`. A single-month statement becomes `YYYY-MM.csv`; a multi-month statement becomes `YYYY-MM_to_YYYY-MM.csv`.
 
-WeChat Pay XLSX exports are supported: the extractor finds their Chinese transaction header after the introductory rows, maps `交易时间`, `交易对方`, `商品`, `收/支`, and `金额(元)`, and retains only `支出` rows. It suggests one of seven budgeting categories: `生活`, `餐饮`, `交通`, `娱乐`, `购物`, `生活娱乐`, or `其他`. Review and correct the suggestions in the UI before analysis.
+WeChat Pay XLSX exports are supported: the extractor finds their Chinese transaction header after the introductory rows, maps `交易时间`, `交易对方`, `商品`, `收/支`, and `金额(元)`, and retains only `支出` rows. It suggests one of seven English budgeting categories: `Living`, `Food and Dining`, `Transport`, `Entertainment`, `Shopping`, `Lifestyle and Social`, or `Other`. Review and correct the suggestions in the UI before analysis.
 
 ## Data import
 

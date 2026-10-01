@@ -33,7 +33,7 @@ def test_initial_workflow_has_no_unanalysed_saving_recommendation(tmp_path: Path
     assert workflow["budget"]["status"] == "within_limit"
     assert "saving_plan" not in workflow
     plan = create_saving_plan(frame, "2026-09", 130, ["gym", "transport"])
-    assert plan["recommendations"] == [{"category": "groceries", "reduction_amount": 120.0, "category_spending": 120.0}]
+    assert plan["recommendations"] == [{"category": "Groceries", "reduction_amount": 120.0, "category_spending": 120.0}]
     assert plan["unmet_amount"] == 10.0
 
 
@@ -50,16 +50,16 @@ def test_wechat_export_with_preamble_and_chinese_headers(tmp_path: Path):
     extracted = load_statement(result.csv_path)
     assert Path(result.csv_path).name == "2026-09.csv"
     assert len(extracted) == 2
-    assert extracted["Category"].tolist() == ["生活", "餐饮"]
+    assert extracted["Category"].tolist() == ["Living", "Food and Dining"]
 
 
 def test_query_transactions_groups_and_filters_local_rows():
     frame = pd.DataFrame({
         "Date": pd.to_datetime(["2026-09-01", "2026-09-02"]),
         "Merchant": ["Alice", "NTUC"], "Description": ["Transfer", "Groceries"],
-        "Amount": [60.0, 20.0], "Category": ["生活娱乐", "生活"],
+        "Amount": [60.0, 20.0], "Category": ["Lifestyle and Social", "Living"],
     })
-    result = query_transactions(frame, "2026-09", category="生活娱乐", group_by="merchant")
+    result = query_transactions(frame, "2026-09", category="Lifestyle and Social", group_by="merchant")
     assert result["matching_transaction_count"] == 1
     assert result["matching_spending"] == 60.0
     assert result["items"] == [{"merchant": "Alice", "spending": 60.0, "transaction_count": 1}]
