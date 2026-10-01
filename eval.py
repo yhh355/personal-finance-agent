@@ -77,16 +77,20 @@ def run_live_evaluation() -> dict[str, Any]:
     frame = load_demo_frame()
     results: list[dict[str, Any]] = []
     for case in cases:
+        maximum_spending = case.get("maximum_spending", 1800.0)
+        saving_target = case.get("saving_target", 200.0)
+        protected_categories = case.get("protected_categories", ["Food and Dining", "Transport"])
         response = run_openrouter_agent(
-            case["prompt"], frame, "2026-09", 1800.0, 200.0,
-            ["Food and Dining", "Transport"], history=None,
+            case["prompt"], frame, "2026-09", maximum_spending, saving_target,
+            protected_categories, history=None,
         )
         tools = [item["tool"] for item in response["tool_trace"]]
         passed = set(case["required_tools"]).issubset(tools)
         results.append({
             "id": case["id"], "passed": passed, "required_tools": case["required_tools"],
             "actual_tools": tools, "tool_calls": len(tools), "model": response["model"],
-            "reported_tokens": response["total_tokens"],
+            "reported_tokens": response["total_tokens"], "saving_target": saving_target,
+            "protected_categories": protected_categories,
         })
     passed_cases = sum(item["passed"] for item in results)
     return {"mode": "live", "total_cases": len(results), "passed_cases": passed_cases, "required_tool_coverage": passed_cases / len(results), "results": results}

@@ -20,7 +20,7 @@ Run only after configuring `OPENROUTER_API_KEY` in `.env`:
 python eval.py --mode live
 ```
 
-The live suite asks two multi-step questions and checks whether required tools appear in the Agent trace. It measures tool-coverage success, not subjective writing quality. Results can vary by model and prompt; live metrics must be reported with the model name and run date rather than copied from offline results.
+The live suite asks ten multi-step questions and checks whether required tools appear in the Agent trace. Five cases test spending diagnosis and five test protected-category saving plans with varied targets. It measures tool-coverage success, not subjective writing quality. Results can vary by model and prompt; live metrics must be reported with the model name and run date rather than copied from offline results.
 
 ## Metric definitions
 

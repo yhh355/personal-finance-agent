@@ -52,8 +52,56 @@
       "required_tools": ["get_spending_insights", "query_transactions"]
     },
     {
+      "id": "largest_category_diagnosis",
+      "prompt": "What is my largest spending category this month? Show the overall evidence and inspect the transactions behind it.",
+      "required_tools": ["get_spending_insights", "query_transactions"]
+    },
+    {
+      "id": "social_spending_diagnosis",
+      "prompt": "Investigate whether my Lifestyle and Social spending is unusually high. Start with the monthly pattern, then inspect supporting transactions.",
+      "required_tools": ["get_spending_insights", "query_transactions"]
+    },
+    {
+      "id": "budget_pressure_diagnosis",
+      "prompt": "Am I close to my S$1,800 monthly limit? Explain the main spending pressure using both the overview and transaction evidence.",
+      "required_tools": ["get_spending_insights", "query_transactions"]
+    },
+    {
+      "id": "shopping_food_diagnosis",
+      "prompt": "Help me understand whether Food and Dining or Shopping is driving my spending. Review the monthly totals and relevant transaction details.",
+      "required_tools": ["get_spending_insights", "query_transactions"]
+    },
+    {
       "id": "protected_savings_request",
       "prompt": "I want to save S$200. Analyse the evidence first, then create a practical plan without reducing Food and Dining or Transport.",
+      "required_tools": ["get_spending_insights", "query_transactions", "create_saving_plan"]
+    },
+    {
+      "id": "food_protected_savings_request",
+      "prompt": "I need to save S$100 this month. Analyse my spending first and give a plan, but keep Food and Dining protected.",
+      "saving_target": 100.0,
+      "protected_categories": ["Food and Dining"],
+      "required_tools": ["get_spending_insights", "query_transactions", "create_saving_plan"]
+    },
+    {
+      "id": "transport_protected_reduction_request",
+      "prompt": "How can I reduce spending by S$300 while keeping Transport? Use the overview and transaction evidence before creating a savings plan.",
+      "saving_target": 300.0,
+      "protected_categories": ["Transport"],
+      "required_tools": ["get_spending_insights", "query_transactions", "create_saving_plan"]
+    },
+    {
+      "id": "two_category_protected_savings_request",
+      "prompt": "I want a S$150 saving plan. Please examine the evidence and do not reduce Food and Dining or Transport.",
+      "saving_target": 150.0,
+      "protected_categories": ["Food and Dining", "Transport"],
+      "required_tools": ["get_spending_insights", "query_transactions", "create_saving_plan"]
+    },
+    {
+      "id": "protected_cutting_request",
+      "prompt": "Find a realistic way to cut S$250 this month. Investigate the spending pattern, inspect the transactions, and create a plan that preserves Food and Dining.",
+      "saving_target": 250.0,
+      "protected_categories": ["Food and Dining"],
       "required_tools": ["get_spending_insights", "query_transactions", "create_saving_plan"]
     }
   ]
