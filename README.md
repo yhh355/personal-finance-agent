@@ -1,12 +1,4 @@
 # Personal Finance Statement Agent
-
-A Streamlit course-demo app for a simple, transparent finance workflow:
-
-```text
-Upload XLSX statement
-  -> direct XLSX-to-CSV import
-  -> data/statements/<billing-period>.csv
-  -> deterministic initial summary + an agent that can query the local statement
 ```
 
 ## Inputs
