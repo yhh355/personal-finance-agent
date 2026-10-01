@@ -9,10 +9,14 @@ The project deliberately avoids bank integration, arbitrary SQL, and automatic f
 ## Workflow
 
 ```text
-Upload XLSX statement
-  -> direct XLSX-to-CSV import
-  -> data/statements/<billing-period>.csv
-  -> deterministic initial summary + an agent that can query the local statement
+User uploads XLSX statement
+  -> Direct extractor creates a local CSV
+  -> User sets budget, saving target, and protected categories
+  -> User asks a finance question
+  -> Agent selects a suitable read-only tool
+  -> Python executes the tool on the local CSV and returns an observation
+  -> Agent reviews the observation and selects a second complementary tool
+  -> Final evidence-based answer and savings recommendation
 ```
 
 ## Inputs
